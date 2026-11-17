@@ -463,3 +463,11 @@ body.mz-dragging{cursor:col-resize;user-select:none}
 .ml-head input{width:18px;height:18px;flex:none}
 .ml-st{color:#5b6b7b;font-size:13px;font-weight:500;margin-left:auto}
 .form-card .ml-ref{margin-top:6px;padding:6px 10px;font-size:14px}
+
+.ml-group{font-weight:700;font-size:13px;color:#1f6fb2;margin:6px 0 -2px}
+.ml-maze{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px;align-items:center}
+.form-card .ml-maze select,.form-card .ml-maze input[type=number]{padding:6px 8px;font-size:14px}
+.ml-maze .ml-shotbtn{justify-self:start}
+.ml-shotst{font-size:13px;color:#5b6b7b}
+.ml-shotst.ok{color:#1e9e5a;font-weight:700}
+@media (max-width:520px){.ml-maze{grid-template-columns:1fr}}

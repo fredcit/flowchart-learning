@@ -642,40 +642,62 @@
   }
 
 
-  /* ---------- 匯出範圍：目前主題 ／ 合併四個基礎主題 ---------- */
+  /* ---------- 匯出範圍：目前主題 ／ 基礎主題合集 ／ 迷宮關卡合集 ／ 全部 ---------- */
   const workOf = t => { const w = store.get('work:' + t.id, null); return w && w.graph ? w.graph : null; };
   const titleOf = t => t.id === 'custom' ? (store.get('title:custom', '') || '自訂主題') : t.title;
   const scopeVal = () => (document.querySelector('input[name=scope]:checked') || {}).value || 'one';
-  function renderMulti() {
-    if (topic && ed && !isMaze(topic)) saveWork(true);
-    let done = 0;
-    $('multiList').innerHTML = BASIC_TOPICS.map(t => {
-      const g = workOf(t), n = g ? g.nodes.length : 0;
-      if (n) done++;
-      return `<div class="ml-row${n ? '' : ' empty'}" data-id="${t.id}">
-        <label class="ml-head"><input type="checkbox" class="ml-inc" ${n ? 'checked' : 'disabled'}>
-          <b>${esc(titleOf(t))}</b><span class="ml-st">${n ? `已畫 ${n} 個符號` : '尚未繪製（不會放進 PDF）'}</span></label>
-        <textarea class="ml-ref" rows="2" maxlength="300" placeholder="這個主題的想法（選填）" ${n ? '' : 'disabled'}>${esc(store.get('reflect:' + t.id, ''))}</textarea>
-      </div>`;
-    }).join('');
-    $('scopeAllNote').textContent = `（已完成 ${done} / ${BASIC_TOPICS.length} 個）`;
-    return done;
+  const SCOPE_TOPICS = { basic: () => BASIC_TOPICS, maze: () => FC.MAZE_TOPICS, every: () => BASIC_TOPICS.concat(FC.MAZE_TOPICS) };
+  const SCOPE_NAME = { basic: '基礎主題合集', maze: '迷宮關卡合集', every: '全部作業合集' };
+  const STATUS_OPTS = ['', '一次通關', '修改後通關', '還沒通關'];
+  const nodesOf = t => { const g = workOf(t); return g ? g.nodes.length : 0; };
+  function rowHTML(t, keep) {
+    const n = nodesOf(t), m = isMaze(t), k = keep || {};
+    const ms = store.get('maze:' + t.id, {});
+    const status = k.status != null ? k.status : (ms.status || ''), blocks = k.blocks != null ? k.blocks : (ms.blocks || '');
+    const ref = k.ref != null ? k.ref : store.get('reflect:' + t.id, '');
+    const inc = n ? (k.inc != null ? k.inc : true) : false;
+    const dis = n ? '' : 'disabled';
+    return `<div class="ml-row${n ? '' : ' empty'}" data-id="${t.id}">
+      <label class="ml-head"><input type="checkbox" class="ml-inc" ${inc ? 'checked' : ''} ${dis}>
+        <b>${esc(titleOf(t))}</b><span class="ml-st">${n ? `已畫 ${n} 個符號` : '尚未繪製（不會放進 PDF）'}</span></label>
+      ${m ? `<div class="ml-maze">
+        <select class="ml-status" aria-label="通關狀態" ${dis}>${STATUS_OPTS.map(o => `<option value="${o}" ${o === status ? 'selected' : ''}>${o || '通關狀態…'}</option>`).join('')}</select>
+        <input class="ml-blocks" type="number" inputmode="numeric" min="0" max="99" value="${esc(String(blocks))}" placeholder="積木數${t.blockLimit ? '（上限 ' + t.blockLimit + '）' : '（不限）'}" aria-label="使用的積木數量" ${dis}>
+        <label class="btn sm shot-btn ml-shotbtn">📷 積木截圖<input class="ml-shot" type="file" accept="image/*" hidden ${dis}></label>
+        <span class="ml-shotst${shots[t.id] ? ' ok' : ''}">${shots[t.id] ? '已選擇截圖' : '未選擇（選填）'}</span>
+      </div>` : ''}
+      <textarea class="ml-ref" rows="2" maxlength="300" placeholder="${m ? '流程圖和積木有哪裡不一樣？（選填）' : '這個主題的想法（選填）'}" ${dis}>${esc(ref)}</textarea>
+    </div>`;
+  }
+  function renderMulti(sc) {
+    saveWork(true);
+    const keep = {};
+    document.querySelectorAll('#multiList .ml-row').forEach(r => {
+      const o = { inc: r.querySelector('.ml-inc').checked, ref: r.querySelector('.ml-ref').value };
+      const st = r.querySelector('.ml-status'); if (st) { o.status = st.value; o.blocks = r.querySelector('.ml-blocks').value; }
+      keep[r.dataset.id] = o;
+    });
+    const list = (SCOPE_TOPICS[sc] || SCOPE_TOPICS.basic)();
+    let html = '', last = '';
+    list.forEach(t => {
+      const g = isMaze(t) ? '迷宮挑戰（Blockly Games）' : '基礎主題';
+      if (sc === 'every' && g !== last) { html += `<div class="ml-group">${g}</div>`; last = g; }
+      html += rowHTML(t, keep[t.id]);
+    });
+    $('multiList').innerHTML = html;
+  }
+  function updateScopeNotes() {
+    const b = BASIC_TOPICS.filter(t => nodesOf(t)).length, m = FC.MAZE_TOPICS.filter(t => nodesOf(t)).length;
+    $('scopeAllNote').textContent = `（已完成 ${b} / ${BASIC_TOPICS.length} 個）`;
+    $('scopeMazeNote').textContent = `（已完成 ${m} / ${FC.MAZE_TOPICS.length} 關）`;
+    return { b, m };
   }
   function applyScope() {
-    const all = scopeVal() === 'all';
-    $('multiList').hidden = !all;
-    $('reflectWrap').hidden = all;
-    $('mazeFields').hidden = all || !isMaze(topic);
-    if (all) renderMultiKeep();
-  }
-  function renderMultiKeep() { /* 切換到合併時，保留目前勾選與已輸入的想法 */
-    const keep = {};
-    document.querySelectorAll('#multiList .ml-row').forEach(r => { keep[r.dataset.id] = { inc: r.querySelector('.ml-inc').checked, ref: r.querySelector('.ml-ref').value }; });
-    renderMulti();
-    document.querySelectorAll('#multiList .ml-row').forEach(r => {
-      const k = keep[r.dataset.id]; if (!k || r.classList.contains('empty')) return;
-      r.querySelector('.ml-inc').checked = k.inc; r.querySelector('.ml-ref').value = k.ref;
-    });
+    const sc = scopeVal(), multi = sc !== 'one';
+    $('multiList').hidden = !multi;
+    $('reflectWrap').hidden = multi;
+    $('mazeFields').hidden = multi || !isMaze(topic);
+    if (multi) renderMulti(sc);
   }
   function loadInfo() {
     const i = store.get('info', {});
@@ -684,28 +706,36 @@
     $('pdfMsg').textContent = ''; $('pdfMsg').className = 'msg';
     mazeSubmitUI();
     $('scopeOneName').textContent = topic ? titleOf(topic) : '';
-    const done = renderMulti();
-    const useAll = !!topic && !isMaze(topic) && done >= 2;           // 已畫 2 個以上基礎主題：預設合併
-    document.querySelector(`input[name=scope][value=${useAll ? 'all' : 'one'}]`).checked = true;
+    const { b, m } = updateScopeNotes();
+    // 已畫 2 個以上同類主題時，預設合併匯出
+    const def = !topic ? 'one' : isMaze(topic) ? (m >= 2 ? 'maze' : 'one') : (b >= 2 ? 'basic' : 'one');
+    document.querySelector(`input[name=scope][value=${def}]`).checked = true;
+    $('multiList').innerHTML = '';
     applyScope();
   }
-  function collectMulti() {
+  function collectMulti(sc) {
     const info = { cls: $('fCls').value.trim(), no: $('fNo').value.trim(), name: $('fName').value.trim() };
     store.set('info', info);
     saveWork(true);
     const items = [];
     document.querySelectorAll('#multiList .ml-row').forEach(r => {
       const t = topicById(r.dataset.id), ref = r.querySelector('.ml-ref').value;
-      if (!r.classList.contains('empty')) store.set('reflect:' + t.id, ref);
+      const st = r.querySelector('.ml-status');
+      if (!r.classList.contains('empty')) {
+        store.set('reflect:' + t.id, ref);
+        if (st) store.set('maze:' + t.id, { status: st.value, blocks: r.querySelector('.ml-blocks').value.trim() });
+      }
       if (!r.querySelector('.ml-inc').checked) return;
       const graph = workOf(t);
       if (!graph || !graph.nodes.length) return;
-      items.push({ graph, topicTitle: titleOf(t), info, reflection: ref, analysis: FC.analyze(graph, t), includeChecks: $('fChecks').checked, maze: null });
+      let maze = null;
+      if (st) maze = { level: t.mazeLevel, status: st.value, blocks: r.querySelector('.ml-blocks').value.trim(), limit: t.blockLimit, shot: shots[t.id] || null, run: FC.runMaze(graph, t.mazeLevel) };
+      items.push({ graph, topicTitle: titleOf(t), info, reflection: ref, analysis: FC.analyze(graph, t), includeChecks: $('fChecks').checked, maze });
     });
-    return { multi: items, info, topicTitle: '基礎主題合集', graph: { nodes: items, edges: [] } };
+    return { multi: items, info, topicTitle: SCOPE_NAME[sc], fileTag: SCOPE_NAME[sc], graph: { nodes: items, edges: [] } };
   }
   function collect() {
-    if (scopeVal() === 'all') return collectMulti();
+    if (scopeVal() !== 'one') return collectMulti(scopeVal());
     const info = { cls: $('fCls').value.trim(), no: $('fNo').value.trim(), name: $('fName').value.trim() };
     store.set('info', info);
     store.set('reflect:' + topic.id, $('fReflect').value);
@@ -749,7 +779,17 @@
     $('fStatus').addEventListener('change', () => schedulePreview(100));
     document.querySelectorAll('input[name=scope]').forEach(r => r.addEventListener('change', () => { applyScope(); pvIdx = 0; schedulePreview(50); }));
     $('multiList').addEventListener('input', () => schedulePreview(500));
-    $('multiList').addEventListener('change', () => { pvIdx = 0; schedulePreview(100); });
+    $('multiList').addEventListener('change', async e => {
+      const el = e.target;
+      if (el.classList.contains('ml-shot')) {                          // 迷宮關卡的積木截圖
+        const row = el.closest('.ml-row'), id = row.dataset.id, f = el.files && el.files[0], st = row.querySelector('.ml-shotst');
+        if (!f) return;
+        try { shots[id] = await readShot(f); st.textContent = '已選擇截圖'; st.className = 'ml-shotst ok'; }
+        catch (err) { st.textContent = err.message; st.className = 'ml-shotst'; return; }
+        el.value = '';
+      }
+      pvIdx = 0; schedulePreview(100);
+    });
     $('fShot').addEventListener('change', async e => {
       const f = e.target.files && e.target.files[0]; if (!f) return;
       try { shots[topic.id] = await readShot(f); } catch (err) { $('shotState').textContent = err.message; $('shotState').className = 'shot-state'; return; }
@@ -770,7 +810,7 @@
         const doc = await FC.buildPdf(d);
         const pdf = FC.pdfFromDoc(doc);
         const safe = s => s.replace(/[\\/:*?"<>|\s]+/g, '');
-        const fn = `流程圖作業_${safe(d.info.cls)}${safe(d.info.no)}${safe(d.info.name)}_${d.multi ? '基礎主題合集' : safe(d.topicTitle)}.pdf`;
+        const fn = `流程圖作業_${safe(d.info.cls)}${safe(d.info.no)}${safe(d.info.name)}_${d.multi ? d.fileTag : safe(d.topicTitle)}.pdf`;
         pdf.save(fn);
         msg.textContent = `已下載：${fn}　請把這個檔案上傳到老師指定的繳交平台。`; msg.className = 'msg ok';
       } catch (err) { msg.textContent = '產生失敗：' + err.message; msg.className = 'msg warn'; }

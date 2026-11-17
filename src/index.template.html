@@ -180,7 +180,9 @@
         <fieldset class="scope-card" id="scopeCard">
           <legend>匯出內容</legend>
           <label class="rad"><input type="radio" name="scope" value="one" checked> 只匯出目前的主題：<b id="scopeOneName"></b></label>
-          <label class="rad"><input type="radio" name="scope" value="all"> 合併基礎主題，放進同一個 PDF <span class="rad-note" id="scopeAllNote"></span></label>
+          <label class="rad"><input type="radio" name="scope" value="basic"> 合併基礎主題（網購、天氣、登入、自訂）<span class="rad-note" id="scopeAllNote"></span></label>
+          <label class="rad"><input type="radio" name="scope" value="maze"> 合併迷宮關卡（Blockly Games 第 1～10 關）<span class="rad-note" id="scopeMazeNote"></span></label>
+          <label class="rad"><input type="radio" name="scope" value="every"> 全部合併（基礎主題＋迷宮關卡）</label>
           <div class="multi-list" id="multiList" hidden></div>
         </fieldset>
         <div class="maze-fields" id="mazeFields" hidden>
