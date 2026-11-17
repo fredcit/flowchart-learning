@@ -2515,22 +2515,16 @@ window.FC = window.FC || {};
     }
   }
 
-  /* 把一個主題的作業排進 doc，從第 P0 頁開始；回傳下一個可用的頁碼。
-     d: {graph, topicTitle, info:{cls,no,name}, reflection, analysis, includeChecks, maze} */
-  async function section(doc, d, P0, idx, count) {
-    let { x: ctx } = doc.page(P0);
-
-    /* ---- 標題區 ---- */
+  /* 頁首：標題、日期、班級／座號／姓名，以及一行「主題」 */
+  function header(ctx, info, title, topicLabel, topicVal) {
     ctx.fillStyle = C.brand; ctx.fillRect(0, 0, PW, 14);
     ctx.fillStyle = C.ink; ctx.font = `700 46px ${FONT}`;
-    ctx.fillText('流程圖學習單', M, 100);
+    ctx.fillText(title, M, 100);
     ctx.fillStyle = C.mute; ctx.font = `400 24px ${FONT}`;
     ctx.fillText('國中資訊科技　演算法的表達', M, 140);
     const today = new Date();
     const ds = `${today.getFullYear()} / ${today.getMonth() + 1} / ${today.getDate()}`;
     ctx.textAlign = 'right'; ctx.fillText(ds, PW - M, 140); ctx.textAlign = 'left';
-
-    /* 基本資料：第一行 班級／座號／姓名，第二行 主題 */
     const field = (lab, val, fx, w, yy) => {
       ctx.fillStyle = C.mute; ctx.font = `500 22px ${FONT}`; ctx.fillText(lab, fx, yy + 30);
       const lw = ctx.measureText(lab).width + 10;
@@ -2541,10 +2535,91 @@ window.FC = window.FC || {};
       ctx.strokeStyle = C.line; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(fx, yy + 42); ctx.lineTo(fx + w, yy + 42); ctx.stroke();
     };
     const total = PW - 2 * M, gap = 24;
-    field('班級', d.info.cls, M, 300, 170);
-    field('座號', d.info.no, M + 300 + gap, 220, 170);
-    field('姓名', d.info.name, M + 520 + 2 * gap, total - 520 - 2 * gap, 170);
-    field(count > 1 ? `主題 ${idx + 1}/${count}` : '主題', d.topicTitle, M, total, 226);
+    field('班級', info.cls, M, 300, 170);
+    field('座號', info.no, M + 300 + gap, 220, 170);
+    field('姓名', info.name, M + 520 + 2 * gap, total - 520 - 2 * gap, 170);
+    if (topicLabel) field(topicLabel, topicVal, M, total, 226);
+  }
+
+  /* 教師批改用目錄：每個項目一列，列出頁碼、符號數、檢查提示、試跑與通關狀態，最後留空白批改欄 */
+  const TOC_ROWS = 14;
+  function tocPageCount(n) { return Math.max(1, Math.ceil(n / TOC_ROWS)); }
+  function drawToc(doc, items, ranges, info, kindName) {
+    const hasMaze = items.some(d => d.maze);
+    const cols = hasMaze
+      ? [['項目', 270], ['頁碼', 84], ['符號', 66], ['待修正', 88], ['想法', 64], ['試跑', 100], ['通關狀態', 124], ['積木', 96], ['截圖', 64]]
+      : [['項目', 400], ['頁碼', 110], ['符號', 90], ['待修正', 110], ['想法', 90]];
+    const used = cols.reduce((a, c) => a + c[1], 0), W = PW - 2 * M;
+    cols.push(['批改', W - used]);
+    const pages = tocPageCount(items.length);
+    const rowH = 84;
+    for (let pg = 0; pg < pages; pg++) {
+      const ctx = doc.page(pg).x;
+      header(ctx, info, pg === 0 ? '作業總覽・教師批改用' : '作業總覽（續）', null, null);
+      let y = 250;
+      if (pg === 0) {
+        const mz = items.filter(d => d.maze), pass = mz.filter(d => d.maze.status && d.maze.status !== '還沒通關').length;
+        ctx.fillStyle = C.ink; ctx.font = `600 26px ${FONT}`;
+        let t = `${kindName}　共 ${items.length} 項作業`;
+        if (mz.length) t += `　學生自報通關 ${pass} / ${mz.length} 關`;
+        ctx.fillText(t, M, y);
+        ctx.fillStyle = C.mute; ctx.font = `400 21px ${FONT}`;
+        ctx.fillText(`「待修正」是 AI 小幫手的提示數量（不計分）；試跑結果由系統自動執行；通關狀態與積木數是學生自填。`, M, y + 36);
+        y += 70;
+      }
+      /* 表頭 */
+      ctx.fillStyle = C.soft; ctx.fillRect(M, y, W, 54);
+      ctx.fillStyle = C.brand; ctx.font = `700 22px ${FONT}`;
+      let cx = M;
+      cols.forEach(([n, w]) => { ctx.textAlign = n === '項目' ? 'left' : 'center'; ctx.fillText(n, n === '項目' ? cx + 14 : cx + w / 2, y + 35); cx += w; });
+      ctx.textAlign = 'left';
+      y += 54;
+      items.slice(pg * TOC_ROWS, (pg + 1) * TOC_ROWS).forEach((d, k) => {
+        const idx = pg * TOC_ROWS + k, r = ranges[idx], m = d.maze;
+        if (k % 2) { ctx.fillStyle = '#f8fbfd'; ctx.fillRect(M, y, W, rowH); }
+        ctx.strokeStyle = C.line; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(M, y + rowH); ctx.lineTo(M + W, y + rowH); ctx.stroke();
+        const warn = d.analysis.checks.filter(c => c.lv === 'warn').length;
+        const cells = [
+          null,
+          r.start === r.end ? `${r.start + 1}` : `${r.start + 1}–${r.end + 1}`,
+          String(d.graph.nodes.length),
+          { v: String(warn), col: warn ? C.warn : C.ok },
+          (d.reflection || '').trim() ? '✓' : '—'
+        ];
+        if (hasMaze) {
+          if (m) {
+            const st = { '一次通關': C.ok, '修改後通關': C.info, '還沒通關': C.warn }[m.status] || C.mute;
+            cells.push(m.run ? { v: m.run.ok ? '成功' : '未成功', col: m.run.ok ? C.ok : C.warn } : '—');
+            cells.push({ v: m.status || '未填', col: st });
+            cells.push(m.blocks ? `${m.blocks}${m.limit ? '/' + m.limit : ''}` : '—');
+            cells.push(m.shot ? '✓' : '—');
+          } else cells.push('—', '—', '—', '—');
+        }
+        cx = M;
+        cols.forEach(([n, w], ci) => {
+          if (n === '批改') { ctx.strokeStyle = C.line; ctx.lineWidth = 1.5; roundRect(ctx, cx + 8, y + 14, w - 16, rowH - 28, 8); ctx.stroke(); cx += w; return; }
+          if (ci === 0) {
+            ctx.fillStyle = C.ink; ctx.font = `600 22px ${FONT}`;
+            const lines = wrapLines(ctx, d.topicTitle, w - 24).slice(0, 2);
+            lines.forEach((l, li) => ctx.fillText(l, cx + 14, y + (lines.length > 1 ? 34 : 49) + li * 28));
+          } else {
+            const c = cells[ci], v = typeof c === 'object' ? c.v : c;
+            ctx.fillStyle = typeof c === 'object' ? c.col : C.ink; ctx.font = `${typeof c === 'object' ? 700 : 500} 22px ${FONT}`;
+            ctx.textAlign = 'center'; ctx.fillText(v, cx + w / 2, y + 49); ctx.textAlign = 'left';
+          }
+          cx += w;
+        });
+        y += rowH;
+      });
+    }
+  }
+
+  /* 把一個主題的作業排進 doc，從第 P0 頁開始；回傳下一個可用的頁碼。
+     d: {graph, topicTitle, info:{cls,no,name}, reflection, analysis, includeChecks, maze} */
+  async function section(doc, d, P0, idx, count) {
+    let { x: ctx } = doc.page(P0);
+
+    header(ctx, d.info, '流程圖學習單', count > 1 ? `主題 ${idx + 1}/${count}` : '主題', d.topicTitle);
 
     /* ---- 流程圖 ---- */
     let y = 330;
@@ -2720,9 +2795,12 @@ window.FC = window.FC || {};
     /* 單一主題：d 本身；合併多個主題：d.multi = [各主題的 d]，每個主題從新的一頁開始 */
     const doc = new Doc();
     const items = d.multi && d.multi.length ? d.multi : [d];
-    let p = 0;
-    for (let i = 0; i < items.length; i++) p = await section(doc, items[i], p, i, items.length);
+    const multi = !!(d.multi && d.multi.length);
+    let p = multi ? tocPageCount(items.length) : 0;       // 合併匯出：前面留給教師批改用目錄
+    const ranges = [];
+    for (let i = 0; i < items.length; i++) { const st = p; p = await section(doc, items[i], p, i, items.length); ranges.push({ start: st, end: p - 1 }); }
     const info = items[0].info;
+    if (multi) drawToc(doc, items, ranges, info, d.fileTag || '合集');
 
     /* ---- 頁尾 ---- */
     doc.pages.forEach((pg, i) => {
