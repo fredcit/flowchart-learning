@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>流程圖學習站｜演算法的表達</title>
+<style>
+/*__CSS__*/
+</style>
+</head>
+<body data-view="learn">
+
+<header class="top">
+  <a class="brand" href="#learn" aria-label="流程圖學習站首頁"><span class="logo" aria-hidden="true"><svg viewBox="0 0 32 32" width="30" height="30"><rect x="9" y="2" width="14" height="7" rx="3.5" fill="#1f6fb2"/><rect x="5" y="13" width="22" height="7" rx="1.5" fill="#14a38b"/><path d="M16 9v4M16 20v3" stroke="#1d2b3a" stroke-width="2"/><path d="M16 23l-6 6h12z" fill="#f0a31b"/></svg></span><span class="brand-t">流程圖學習站<small>演算法的表達</small></span></a>
+  <nav class="stepper" id="stepper" aria-label="學習步驟">
+    <a href="#learn" data-v="learn"><b>1</b><span>課堂講解</span></a>
+    <a href="#symbols" data-v="symbols"><b>2</b><span>認識符號</span></a>
+    <a href="#topics" data-v="topics"><b>3</b><span>選擇主題</span></a>
+    <a href="#draw" data-v="draw"><b>4</b><span>繪製流程圖</span></a>
+    <a href="#submit" data-v="submit"><b>5</b><span>產出作業</span></a>
+  </nav>
+</header>
+
+<main>
+
+<!-- ① 課堂講解 -->
+<section class="view" id="view-learn">
+  <div class="slide-area" id="slideArea">
+    <div class="stage-wrap" id="stageWrap"><div class="stage" id="stage"></div></div>
+    <div class="slide-bar" id="slideBar">
+      <button class="btn sm" id="btnPrev" aria-label="上一頁">◀ 上一頁</button>
+      <div class="slide-prog" id="slideProg" title="點擊跳到該頁"><i id="slideProgBar"></i></div>
+      <span class="slide-count" id="slideCount">1 / 16</span>
+      <button class="btn sm" id="btnNext" aria-label="下一頁">下一頁 ▶</button>
+      <button class="btn sm" id="btnFull" title="全螢幕（F）">⛶ 全螢幕</button>
+    </div>
+  </div>
+</section>
+
+<!-- ② 認識符號 -->
+<section class="view" id="view-symbols">
+  <div class="page">
+    <div class="page-head">
+      <h1>認識流程圖的符號</h1>
+      <p>每一種符號都有自己的任務。先看看卡片，再挑戰下面的小測驗（只是練習，不計分）。</p>
+    </div>
+    <div class="sym-cards" id="symCards"></div>
+    <div class="principles-box">
+      <h2>流程圖繪製原則</h2>
+      <ol>
+        <li><span>1</span><div>使用<b>標準符號</b>，以便閱讀和分析。</div></li>
+        <li><span>2</span><div>文字<b>簡潔且明確可行</b>。</div></li>
+        <li><span>3</span><div>繪製方向<b>由上而下，由左至右</b>。</div></li>
+        <li><span>4</span><div>流程線條<b>避免交叉或過長</b>。</div></li>
+      </ol>
+    </div>
+    <div class="quiz-wrap">
+      <h2>符號小測驗</h2>
+      <div class="quiz" id="quiz"></div>
+    </div>
+    <div class="page-foot"><a class="btn primary big" href="#topics">下一步：選擇主題 →</a></div>
+  </div>
+</section>
+
+<!-- ③ 選擇主題 -->
+<section class="view" id="view-topics">
+  <div class="page">
+    <div class="page-head">
+      <h1>選擇你的主題</h1>
+      <p>選一個主題開始畫流程圖。星星越多代表越有挑戰性，你可以隨時回來換主題，每個主題的進度都會保留在這台裝置上。</p>
+    </div>
+    <h2 class="group-h">基礎主題</h2>
+    <div class="topic-cards" id="topicCards"></div>
+    <h2 class="group-h maze-h">迷宮挑戰　<small>搭配 Blockly Games 迷宮，共 10 關</small></h2>
+    <p class="group-p"><b>先畫再玩：</b>看地圖，先在流程圖畫出走迷宮的步驟，再用積木實際驗證。流程圖畫對了，積木就能通關；通不過，就回頭檢查流程圖。</p>
+    <div class="maze-cards" id="mazeCards"></div>
+  </div>
+</section>
+
+<!-- ④ 繪製 -->
+<section class="view" id="view-draw">
+  <div class="draw-top">
+    <div class="dt-map" id="dMap" hidden></div>
+    <div class="dt-main">
+      <div class="dt-title" id="dTitleWrap">
+        <span class="dt-badge" id="dBadge"></span>
+        <h2 id="dTitle"></h2>
+        <input id="dTitleIn" type="text" maxlength="30" placeholder="為你的流程取個名字，例如：泡泡麵製作流程" aria-label="自訂主題名稱">
+      </div>
+      <p id="dScenario"></p>
+    </div>
+    <details class="dt-hint" id="dHint"><summary>需要提示嗎？</summary><div id="dHintBody"></div></details>
+    <button class="btn primary" id="tNext">完成，產出作業 →</button>
+  </div>
+  <div class="mz-bar" id="mzBar" hidden>
+    <div class="mz-levels" id="mzLevels" role="tablist" aria-label="迷宮關卡"></div>
+    <ol class="mz-steps" aria-label="學習步驟"><li>① 看地圖</li><li class="on">② 畫流程圖</li><li>③ 積木驗證</li><li>④ 修正</li></ol>
+    <div class="mz-modes" role="tablist" aria-label="畫面配置">
+      <button data-m="both" role="tab">並排</button><button data-m="maze" role="tab">只看積木</button><button data-m="flow" role="tab">只看流程圖</button>
+    </div>
+  </div>
+  <div class="draw-main" id="drawMain">
+    <section class="mz-pane" id="mzPane" hidden aria-label="Blockly Games 迷宮">
+      <div class="mz-head">
+        <b>積木</b><span class="mz-sub">Blockly Games 迷宮 <i id="mzLvTag"></i></span><span class="grow"></span>
+        <button class="btn sm" id="mzReload" title="重新載入這一關（積木會清空）">↻ 重新載入</button>
+        <a class="btn sm" id="mzOpen" target="_blank" rel="noopener" title="用新分頁開啟（積木區較大）">↗ 新分頁</a>
+      </div>
+      <div class="mz-frame" id="mzFrame"><iframe id="mzIframe" title="Blockly Games 迷宮" referrerpolicy="no-referrer" loading="eager"></iframe></div>
+      <div class="mz-banner" id="mzBanner" hidden></div>
+    </section>
+    <div class="mz-split" id="mzSplit" hidden role="separator" aria-orientation="vertical" title="拖曳調整左右大小"></div>
+    <div class="draw-grid" id="drawGrid">
+      <aside class="palette" id="palette" aria-label="符號區">
+        <h3>符號</h3>
+        <div class="pal-list" id="palList"></div>
+        <p class="pal-hint">拖曳到畫布，<br>或點一下自動放置</p>
+      </aside>
+      <div class="center">
+        <div class="toolbar" id="toolbar">
+          <button class="btn sm" id="tUndo" title="復原（Ctrl/⌘ + Z）">↶ 復原</button>
+          <button class="btn sm" id="tRedo" title="重做">↷ 重做</button>
+          <span class="sep"></span>
+          <button class="btn sm toggle" id="tConnect" aria-pressed="false" title="依序點兩個符號，畫出流向線">➜ 連線</button>
+          <button class="btn sm" id="tDel" title="刪除選取的項目（Delete）">🗑 刪除</button>
+          <button class="btn sm" id="tClear">清空</button>
+          <span class="sep"></span>
+          <button class="btn sm icon" id="tZoomOut" aria-label="縮小">－</button><span class="zoom-lbl" id="tZoomLbl">100%</span><button class="btn sm icon" id="tZoomIn" aria-label="放大">＋</button><button class="btn sm" id="tFit" title="縮放到整張流程圖都看得到">⤢ 符合視窗</button>
+          <span class="grow"></span>
+          <button class="btn sm teacher" id="tTeacher" hidden>教師：參考答案</button>
+          <button class="btn sm toggle run-toggle" id="tRun" aria-pressed="false" hidden title="讓小人照著你的流程圖在迷宮裡走一遍">▶ 試跑</button>
+          <button class="btn sm toggle side-toggle" id="tSide" aria-pressed="false" hidden>檢查提示<i id="tSideBadge" hidden></i></button>
+        </div>
+        <div class="selbar" id="selbar"></div>
+        <div class="canvas-wrap" id="canvasWrap"><svg id="canvas" xmlns="http://www.w3.org/2000/svg"></svg></div>
+        <div class="run-panel" id="runPanel" hidden role="region" aria-label="試跑流程圖">
+          <div class="rp-head"><b>▶ 試跑流程圖</b><span class="rp-lv" id="rpLv"></span><span class="grow"></span>
+            <button type="button" id="rpSide" title="移到另一邊" aria-label="移到另一邊">⇄</button><button type="button" id="rpClose" title="關閉" aria-label="關閉試跑">✕</button></div>
+          <div class="rp-board" id="rpBoard"></div>
+          <div class="rp-status" id="rpStatus" aria-live="polite"></div>
+          <div class="rp-ctrl">
+            <button class="btn sm primary" id="rpPlay" type="button">▶ 試跑</button>
+            <button class="btn sm" id="rpStep" type="button">⏭ 單步</button>
+            <button class="btn sm" id="rpReset" type="button">↺ 重置</button>
+            <select id="rpSpeed" aria-label="速度"><option value="800">慢</option><option value="450" selected>中</option><option value="160">快</option></select>
+          </div>
+          <div class="rp-result" id="rpResult" hidden aria-live="polite"></div>
+        </div>
+      </div>
+      <aside class="side" id="side">
+        <div class="side-tabs" role="tablist">
+          <button class="on" data-p="checks" role="tab">檢查提示<i id="tabCheckBadge" hidden></i></button>
+          <button data-p="steps" role="tab">文字步驟與虛擬碼</button>
+        </div>
+        <div class="panel" id="panelChecks"></div>
+        <div class="panel" id="panelSteps" hidden>
+          <h4 class="pn-h">文字步驟</h4><div class="lines" id="stepsList"></div>
+          <h4 class="pn-h">虛擬碼</h4><div class="lines code" id="codeList"></div>
+          <p class="pn-note">這兩欄會依照你的流程圖自動產生，可以對照看看三種表示法是不是一樣的意思。</p>
+        </div>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<!-- ⑤ 產出作業 -->
+<section class="view" id="view-submit">
+  <div class="page wide">
+    <div class="page-head">
+      <h1>產出作業 PDF</h1>
+      <p>填好基本資料，確認右邊的預覽沒問題，就可以下載 PDF，再上傳到老師指定的地方繳交。</p>
+    </div>
+    <div class="submit-grid">
+      <div class="form-card">
+        <div class="f-row three">
+          <label>班級<input id="fCls" type="text" maxlength="10" placeholder="例：701" autocomplete="off"></label>
+          <label>座號<input id="fNo" type="text" inputmode="numeric" maxlength="3" placeholder="例：15" autocomplete="off"></label>
+          <label>姓名<input id="fName" type="text" maxlength="12" placeholder="你的名字" autocomplete="off"></label>
+        </div>
+        <div class="maze-fields" id="mazeFields" hidden>
+          <h3>積木驗證（Blockly Games 迷宮）</h3>
+          <div class="f-row two">
+            <label>通關狀態
+              <select id="fStatus"><option value="">請選擇</option><option>一次通關</option><option>修改後通關</option><option>還沒通關</option></select>
+            </label>
+            <label>使用的積木數量<input id="fBlocks" type="number" inputmode="numeric" min="0" max="99" placeholder="" autocomplete="off"></label>
+          </div>
+          <div class="shot-row">
+            <label class="btn sm shot-btn">📷 上傳積木截圖<input id="fShot" type="file" accept="image/*" hidden></label>
+            <span class="shot-state" id="shotState">還沒有選擇圖片（選填）</span>
+            <button class="btn sm" id="shotClear" type="button" hidden>移除</button>
+          </div>
+        </div>
+        <label class="f-col"><span id="reflectLabel">我的想法（選填）</span>
+          <textarea id="fReflect" rows="4" maxlength="400" placeholder="這次畫流程圖，你覺得哪個符號最容易用錯？學到了什麼？"></textarea>
+        </label>
+        <label class="chk"><input type="checkbox" id="fChecks" checked> 在 PDF 附上 AI 小幫手的檢查結果</label>
+        <div class="f-actions">
+          <button class="btn primary big" id="btnPdf">⬇ 下載 PDF</button>
+          <a class="btn big" href="#draw">← 回去修改</a>
+        </div>
+        <p class="msg" id="pdfMsg" aria-live="polite"></p>
+      </div>
+      <div class="preview-card">
+        <div class="pv-head"><h3>PDF 預覽</h3><span class="pv-state" id="pvState"></span></div>
+        <div class="pv-frame"><img id="pvImg" alt="PDF 預覽"></div>
+        <div class="pv-pager"><button class="btn sm" id="pvPrev">◀</button><span id="pvInfo"></span><button class="btn sm" id="pvNext">▶</button></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<script>
+/*__JSPDF__*/
+</script>
+<script>
+/*__JS__*/
+</script>
+</body>
+</html>
