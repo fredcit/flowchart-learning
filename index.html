@@ -457,6 +457,20 @@ body.mz-dragging{cursor:col-resize;user-select:none}
 .run-toggle.on{background:#2a9d5c;border-color:#2a9d5c;color:#fff}
 @media (max-width:1180px){.run-panel{width:250px}}
 
+/* 匯出範圍（合併多個主題） */
+.form-card .scope-card{border:1.5px solid var(--line);border-radius:14px;padding:10px 16px 14px;margin:0 0 16px;background:#fafcfe;min-width:0}
+.scope-card legend{font-weight:700;padding:0 6px;font-size:15px}
+.form-card .scope-card label.rad{flex-direction:row;align-items:flex-start;gap:8px;padding:6px 0;cursor:pointer;line-height:1.5;font-weight:600;text-align:left;flex-wrap:wrap}
+.scope-card .rad input{width:18px;height:18px;flex:none;margin-top:3px}
+.scope-card .rad-note{color:#5b6b7b;font-size:13px;font-weight:500}
+.multi-list{display:grid;gap:10px;margin-top:8px}
+.ml-row{border:1px solid #dbe4ec;border-radius:10px;padding:8px 10px;background:#fff}
+.ml-row.empty{opacity:.6}
+.form-card .ml-head{flex-direction:row;align-items:center;gap:8px;flex-wrap:wrap;cursor:pointer;text-align:left}
+.ml-head input{width:18px;height:18px;flex:none}
+.ml-st{color:#5b6b7b;font-size:13px;font-weight:500;margin-left:auto}
+.form-card .ml-ref{margin-top:6px;padding:6px 10px;font-size:14px}
+
 </style>
 </head>
 <body data-view="learn">
@@ -628,6 +642,12 @@ body.mz-dragging{cursor:col-resize;user-select:none}
           <label>座號<input id="fNo" type="text" inputmode="numeric" maxlength="3" placeholder="例：15" autocomplete="off"></label>
           <label>姓名<input id="fName" type="text" maxlength="12" placeholder="你的名字" autocomplete="off"></label>
         </div>
+        <fieldset class="scope-card" id="scopeCard">
+          <legend>匯出內容</legend>
+          <label class="rad"><input type="radio" name="scope" value="one" checked> 只匯出目前的主題：<b id="scopeOneName"></b></label>
+          <label class="rad"><input type="radio" name="scope" value="all"> 合併基礎主題，放進同一個 PDF <span class="rad-note" id="scopeAllNote"></span></label>
+          <div class="multi-list" id="multiList" hidden></div>
+        </fieldset>
         <div class="maze-fields" id="mazeFields" hidden>
           <h3>積木驗證（Blockly Games 迷宮）</h3>
           <div class="f-row two">
@@ -642,7 +662,7 @@ body.mz-dragging{cursor:col-resize;user-select:none}
             <button class="btn sm" id="shotClear" type="button" hidden>移除</button>
           </div>
         </div>
-        <label class="f-col"><span id="reflectLabel">我的想法（選填）</span>
+        <label class="f-col" id="reflectWrap"><span id="reflectLabel">我的想法（選填）</span>
           <textarea id="fReflect" rows="4" maxlength="400" placeholder="這次畫流程圖，你覺得哪個符號最容易用錯？學到了什麼？"></textarea>
         </label>
         <label class="chk"><input type="checkbox" id="fChecks" checked> 在 PDF 附上 AI 小幫手的檢查結果</label>
@@ -2485,10 +2505,10 @@ window.FC = window.FC || {};
     }
   }
 
-  FC.buildPdf = async function (d) {
-    /* d: {graph, topicTitle, info:{cls,no,name}, reflection, analysis, includeChecks} */
-    const doc = new Doc();
-    let { x: ctx } = doc.page(0);
+  /* 把一個主題的作業排進 doc，從第 P0 頁開始；回傳下一個可用的頁碼。
+     d: {graph, topicTitle, info:{cls,no,name}, reflection, analysis, includeChecks, maze} */
+  async function section(doc, d, P0, idx, count) {
+    let { x: ctx } = doc.page(P0);
 
     /* ---- 標題區 ---- */
     ctx.fillStyle = C.brand; ctx.fillRect(0, 0, PW, 14);
@@ -2514,7 +2534,7 @@ window.FC = window.FC || {};
     field('班級', d.info.cls, M, 300, 170);
     field('座號', d.info.no, M + 300 + gap, 220, 170);
     field('姓名', d.info.name, M + 520 + 2 * gap, total - 520 - 2 * gap, 170);
-    field('主題', d.topicTitle, M, total, 226);
+    field(count > 1 ? `主題 ${idx + 1}/${count}` : '主題', d.topicTitle, M, total, 226);
 
     /* ---- 流程圖 ---- */
     let y = 330;
@@ -2523,7 +2543,7 @@ window.FC = window.FC || {};
       x.fillStyle = C.brand; x.fillRect(M, yy - 26, 8, 34);
       x.fillStyle = C.ink; x.font = `700 32px ${FONT}`; x.fillText(text, M + 22, yy);
     };
-    sectionTitle(0, y, '我的流程圖');
+    sectionTitle(P0, y, '我的流程圖');
     y += 24;
 
     if (d.graph.nodes.length) {
@@ -2541,7 +2561,7 @@ window.FC = window.FC || {};
     }
 
     /* ---- 文字步驟 ｜ 虛擬碼 ---- */
-    let page = 0;
+    let page = P0;
     const bottom = PH - 110;
     const ensure = (p) => doc.page(p).x;
     function newPageIfNeeded(need) {
@@ -2683,12 +2703,23 @@ window.FC = window.FC || {};
       }
     }
 
+    return page + 1;
+  }
+
+  FC.buildPdf = async function (d) {
+    /* 單一主題：d 本身；合併多個主題：d.multi = [各主題的 d]，每個主題從新的一頁開始 */
+    const doc = new Doc();
+    const items = d.multi && d.multi.length ? d.multi : [d];
+    let p = 0;
+    for (let i = 0; i < items.length; i++) p = await section(doc, items[i], p, i, items.length);
+    const info = items[0].info;
+
     /* ---- 頁尾 ---- */
-    doc.pages.forEach((p, i) => {
-      p.x.fillStyle = C.mute; p.x.font = `400 20px ${FONT}`;
-      p.x.fillText(`流程圖學習網頁　${d.info.cls || ''} ${d.info.no ? d.info.no + '號' : ''} ${d.info.name || ''}`.trim(), M, PH - 50);
-      p.x.textAlign = 'right'; p.x.fillText(`第 ${i + 1} 頁 / 共 ${doc.pages.length} 頁`, PW - M, PH - 50); p.x.textAlign = 'left';
-      p.x.strokeStyle = C.line; p.x.lineWidth = 2; p.x.beginPath(); p.x.moveTo(M, PH - 80); p.x.lineTo(PW - M, PH - 80); p.x.stroke();
+    doc.pages.forEach((pg, i) => {
+      pg.x.fillStyle = C.mute; pg.x.font = `400 20px ${FONT}`;
+      pg.x.fillText(`流程圖學習網頁　${info.cls || ''} ${info.no ? info.no + '號' : ''} ${info.name || ''}`.trim(), M, PH - 50);
+      pg.x.textAlign = 'right'; pg.x.fillText(`第 ${i + 1} 頁 / 共 ${doc.pages.length} 頁`, PW - M, PH - 50); pg.x.textAlign = 'left';
+      pg.x.strokeStyle = C.line; pg.x.lineWidth = 2; pg.x.beginPath(); pg.x.moveTo(M, PH - 80); pg.x.lineTo(PW - M, PH - 80); pg.x.stroke();
     });
     return doc;
   };
@@ -3551,14 +3582,70 @@ window.FC = window.FC || {};
   }
 
 
+  /* ---------- 匯出範圍：目前主題 ／ 合併四個基礎主題 ---------- */
+  const workOf = t => { const w = store.get('work:' + t.id, null); return w && w.graph ? w.graph : null; };
+  const titleOf = t => t.id === 'custom' ? (store.get('title:custom', '') || '自訂主題') : t.title;
+  const scopeVal = () => (document.querySelector('input[name=scope]:checked') || {}).value || 'one';
+  function renderMulti() {
+    if (topic && ed && !isMaze(topic)) saveWork(true);
+    let done = 0;
+    $('multiList').innerHTML = BASIC_TOPICS.map(t => {
+      const g = workOf(t), n = g ? g.nodes.length : 0;
+      if (n) done++;
+      return `<div class="ml-row${n ? '' : ' empty'}" data-id="${t.id}">
+        <label class="ml-head"><input type="checkbox" class="ml-inc" ${n ? 'checked' : 'disabled'}>
+          <b>${esc(titleOf(t))}</b><span class="ml-st">${n ? `已畫 ${n} 個符號` : '尚未繪製（不會放進 PDF）'}</span></label>
+        <textarea class="ml-ref" rows="2" maxlength="300" placeholder="這個主題的想法（選填）" ${n ? '' : 'disabled'}>${esc(store.get('reflect:' + t.id, ''))}</textarea>
+      </div>`;
+    }).join('');
+    $('scopeAllNote').textContent = `（已完成 ${done} / ${BASIC_TOPICS.length} 個）`;
+    return done;
+  }
+  function applyScope() {
+    const all = scopeVal() === 'all';
+    $('multiList').hidden = !all;
+    $('reflectWrap').hidden = all;
+    $('mazeFields').hidden = all || !isMaze(topic);
+    if (all) renderMultiKeep();
+  }
+  function renderMultiKeep() { /* 切換到合併時，保留目前勾選與已輸入的想法 */
+    const keep = {};
+    document.querySelectorAll('#multiList .ml-row').forEach(r => { keep[r.dataset.id] = { inc: r.querySelector('.ml-inc').checked, ref: r.querySelector('.ml-ref').value }; });
+    renderMulti();
+    document.querySelectorAll('#multiList .ml-row').forEach(r => {
+      const k = keep[r.dataset.id]; if (!k || r.classList.contains('empty')) return;
+      r.querySelector('.ml-inc').checked = k.inc; r.querySelector('.ml-ref').value = k.ref;
+    });
+  }
   function loadInfo() {
     const i = store.get('info', {});
     $('fCls').value = i.cls || ''; $('fNo').value = i.no || ''; $('fName').value = i.name || '';
     $('fReflect').value = store.get('reflect:' + (topic ? topic.id : ''), '');
     $('pdfMsg').textContent = ''; $('pdfMsg').className = 'msg';
     mazeSubmitUI();
+    $('scopeOneName').textContent = topic ? titleOf(topic) : '';
+    const done = renderMulti();
+    const useAll = !!topic && !isMaze(topic) && done >= 2;           // 已畫 2 個以上基礎主題：預設合併
+    document.querySelector(`input[name=scope][value=${useAll ? 'all' : 'one'}]`).checked = true;
+    applyScope();
+  }
+  function collectMulti() {
+    const info = { cls: $('fCls').value.trim(), no: $('fNo').value.trim(), name: $('fName').value.trim() };
+    store.set('info', info);
+    saveWork(true);
+    const items = [];
+    document.querySelectorAll('#multiList .ml-row').forEach(r => {
+      const t = topicById(r.dataset.id), ref = r.querySelector('.ml-ref').value;
+      if (!r.classList.contains('empty')) store.set('reflect:' + t.id, ref);
+      if (!r.querySelector('.ml-inc').checked) return;
+      const graph = workOf(t);
+      if (!graph || !graph.nodes.length) return;
+      items.push({ graph, topicTitle: titleOf(t), info, reflection: ref, analysis: FC.analyze(graph, t), includeChecks: $('fChecks').checked, maze: null });
+    });
+    return { multi: items, info, topicTitle: '基礎主題合集', graph: { nodes: items, edges: [] } };
   }
   function collect() {
+    if (scopeVal() === 'all') return collectMulti();
     const info = { cls: $('fCls').value.trim(), no: $('fNo').value.trim(), name: $('fName').value.trim() };
     store.set('info', info);
     store.set('reflect:' + topic.id, $('fReflect').value);
@@ -3585,7 +3672,7 @@ window.FC = window.FC || {};
       pdfDoc = doc; pvIdx = Math.min(pvIdx, doc.pages.length - 1); showPage();
       $('pvState').textContent = '';
       const empty = !d.graph.nodes.length;
-      $('pdfMsg').textContent = empty ? '提醒：你還沒有畫流程圖，回到上一步畫好再下載喔。' : '';
+      $('pdfMsg').textContent = empty ? (d.multi ? '提醒：請至少勾選一個已經畫好的主題。' : '提醒：你還沒有畫流程圖，回到上一步畫好再下載喔。') : '';
       $('pdfMsg').className = 'msg ' + (empty ? 'warn' : '');
     } catch (err) {
       $('pvState').textContent = '預覽失敗：' + err.message;
@@ -3600,6 +3687,9 @@ window.FC = window.FC || {};
   function initSubmit() {
     ['fCls', 'fNo', 'fName', 'fReflect', 'fChecks', 'fBlocks'].forEach(id => $(id).addEventListener('input', () => schedulePreview(500)));
     $('fStatus').addEventListener('change', () => schedulePreview(100));
+    document.querySelectorAll('input[name=scope]').forEach(r => r.addEventListener('change', () => { applyScope(); pvIdx = 0; schedulePreview(50); }));
+    $('multiList').addEventListener('input', () => schedulePreview(500));
+    $('multiList').addEventListener('change', () => { pvIdx = 0; schedulePreview(100); });
     $('fShot').addEventListener('change', async e => {
       const f = e.target.files && e.target.files[0]; if (!f) return;
       try { shots[topic.id] = await readShot(f); } catch (err) { $('shotState').textContent = err.message; $('shotState').className = 'shot-state'; return; }
@@ -3613,14 +3703,14 @@ window.FC = window.FC || {};
       const msg = $('pdfMsg');
       const d = collect();
       if (!d.info.name) { msg.textContent = '請先填寫姓名，老師才知道是誰的作業喔。'; msg.className = 'msg warn'; $('fName').focus(); return; }
-      if (!d.graph.nodes.length) { msg.textContent = '還沒有流程圖內容，請先回到上一步繪製。'; msg.className = 'msg warn'; return; }
+      if (!d.graph.nodes.length) { msg.textContent = d.multi ? '請至少勾選一個已經畫好的主題。' : '還沒有流程圖內容，請先回到上一步繪製。'; msg.className = 'msg warn'; return; }
       if (!window.jspdf) { msg.textContent = 'PDF 元件載入失敗，請重新整理網頁。'; msg.className = 'msg warn'; return; }
       $('btnPdf').disabled = true; msg.textContent = '產生 PDF 中…'; msg.className = 'msg';
       try {
         const doc = await FC.buildPdf(d);
         const pdf = FC.pdfFromDoc(doc);
         const safe = s => s.replace(/[\\/:*?"<>|\s]+/g, '');
-        const fn = `流程圖作業_${safe(d.info.cls)}${safe(d.info.no)}${safe(d.info.name)}_${safe(d.topicTitle)}.pdf`;
+        const fn = `流程圖作業_${safe(d.info.cls)}${safe(d.info.no)}${safe(d.info.name)}_${d.multi ? '基礎主題合集' : safe(d.topicTitle)}.pdf`;
         pdf.save(fn);
         msg.textContent = `已下載：${fn}　請把這個檔案上傳到老師指定的繳交平台。`; msg.className = 'msg ok';
       } catch (err) { msg.textContent = '產生失敗：' + err.message; msg.className = 'msg warn'; }

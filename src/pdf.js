@@ -48,10 +48,10 @@
     }
   }
 
-  FC.buildPdf = async function (d) {
-    /* d: {graph, topicTitle, info:{cls,no,name}, reflection, analysis, includeChecks} */
-    const doc = new Doc();
-    let { x: ctx } = doc.page(0);
+  /* 把一個主題的作業排進 doc，從第 P0 頁開始；回傳下一個可用的頁碼。
+     d: {graph, topicTitle, info:{cls,no,name}, reflection, analysis, includeChecks, maze} */
+  async function section(doc, d, P0, idx, count) {
+    let { x: ctx } = doc.page(P0);
 
     /* ---- 標題區 ---- */
     ctx.fillStyle = C.brand; ctx.fillRect(0, 0, PW, 14);
@@ -77,7 +77,7 @@
     field('班級', d.info.cls, M, 300, 170);
     field('座號', d.info.no, M + 300 + gap, 220, 170);
     field('姓名', d.info.name, M + 520 + 2 * gap, total - 520 - 2 * gap, 170);
-    field('主題', d.topicTitle, M, total, 226);
+    field(count > 1 ? `主題 ${idx + 1}/${count}` : '主題', d.topicTitle, M, total, 226);
 
     /* ---- 流程圖 ---- */
     let y = 330;
@@ -86,7 +86,7 @@
       x.fillStyle = C.brand; x.fillRect(M, yy - 26, 8, 34);
       x.fillStyle = C.ink; x.font = `700 32px ${FONT}`; x.fillText(text, M + 22, yy);
     };
-    sectionTitle(0, y, '我的流程圖');
+    sectionTitle(P0, y, '我的流程圖');
     y += 24;
 
     if (d.graph.nodes.length) {
@@ -104,7 +104,7 @@
     }
 
     /* ---- 文字步驟 ｜ 虛擬碼 ---- */
-    let page = 0;
+    let page = P0;
     const bottom = PH - 110;
     const ensure = (p) => doc.page(p).x;
     function newPageIfNeeded(need) {
@@ -246,12 +246,23 @@
       }
     }
 
+    return page + 1;
+  }
+
+  FC.buildPdf = async function (d) {
+    /* 單一主題：d 本身；合併多個主題：d.multi = [各主題的 d]，每個主題從新的一頁開始 */
+    const doc = new Doc();
+    const items = d.multi && d.multi.length ? d.multi : [d];
+    let p = 0;
+    for (let i = 0; i < items.length; i++) p = await section(doc, items[i], p, i, items.length);
+    const info = items[0].info;
+
     /* ---- 頁尾 ---- */
-    doc.pages.forEach((p, i) => {
-      p.x.fillStyle = C.mute; p.x.font = `400 20px ${FONT}`;
-      p.x.fillText(`流程圖學習網頁　${d.info.cls || ''} ${d.info.no ? d.info.no + '號' : ''} ${d.info.name || ''}`.trim(), M, PH - 50);
-      p.x.textAlign = 'right'; p.x.fillText(`第 ${i + 1} 頁 / 共 ${doc.pages.length} 頁`, PW - M, PH - 50); p.x.textAlign = 'left';
-      p.x.strokeStyle = C.line; p.x.lineWidth = 2; p.x.beginPath(); p.x.moveTo(M, PH - 80); p.x.lineTo(PW - M, PH - 80); p.x.stroke();
+    doc.pages.forEach((pg, i) => {
+      pg.x.fillStyle = C.mute; pg.x.font = `400 20px ${FONT}`;
+      pg.x.fillText(`流程圖學習網頁　${info.cls || ''} ${info.no ? info.no + '號' : ''} ${info.name || ''}`.trim(), M, PH - 50);
+      pg.x.textAlign = 'right'; pg.x.fillText(`第 ${i + 1} 頁 / 共 ${doc.pages.length} 頁`, PW - M, PH - 50); pg.x.textAlign = 'left';
+      pg.x.strokeStyle = C.line; pg.x.lineWidth = 2; pg.x.beginPath(); pg.x.moveTo(M, PH - 80); pg.x.lineTo(PW - M, PH - 80); pg.x.stroke();
     });
     return doc;
   };

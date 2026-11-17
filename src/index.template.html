@@ -177,6 +177,12 @@
           <label>座號<input id="fNo" type="text" inputmode="numeric" maxlength="3" placeholder="例：15" autocomplete="off"></label>
           <label>姓名<input id="fName" type="text" maxlength="12" placeholder="你的名字" autocomplete="off"></label>
         </div>
+        <fieldset class="scope-card" id="scopeCard">
+          <legend>匯出內容</legend>
+          <label class="rad"><input type="radio" name="scope" value="one" checked> 只匯出目前的主題：<b id="scopeOneName"></b></label>
+          <label class="rad"><input type="radio" name="scope" value="all"> 合併基礎主題，放進同一個 PDF <span class="rad-note" id="scopeAllNote"></span></label>
+          <div class="multi-list" id="multiList" hidden></div>
+        </fieldset>
         <div class="maze-fields" id="mazeFields" hidden>
           <h3>積木驗證（Blockly Games 迷宮）</h3>
           <div class="f-row two">
@@ -191,7 +197,7 @@
             <button class="btn sm" id="shotClear" type="button" hidden>移除</button>
           </div>
         </div>
-        <label class="f-col"><span id="reflectLabel">我的想法（選填）</span>
+        <label class="f-col" id="reflectWrap"><span id="reflectLabel">我的想法（選填）</span>
           <textarea id="fReflect" rows="4" maxlength="400" placeholder="這次畫流程圖，你覺得哪個符號最容易用錯？學到了什麼？"></textarea>
         </label>
         <label class="chk"><input type="checkbox" id="fChecks" checked> 在 PDF 附上 AI 小幫手的檢查結果</label>

@@ -642,14 +642,70 @@
   }
 
 
+  /* ---------- 匯出範圍：目前主題 ／ 合併四個基礎主題 ---------- */
+  const workOf = t => { const w = store.get('work:' + t.id, null); return w && w.graph ? w.graph : null; };
+  const titleOf = t => t.id === 'custom' ? (store.get('title:custom', '') || '自訂主題') : t.title;
+  const scopeVal = () => (document.querySelector('input[name=scope]:checked') || {}).value || 'one';
+  function renderMulti() {
+    if (topic && ed && !isMaze(topic)) saveWork(true);
+    let done = 0;
+    $('multiList').innerHTML = BASIC_TOPICS.map(t => {
+      const g = workOf(t), n = g ? g.nodes.length : 0;
+      if (n) done++;
+      return `<div class="ml-row${n ? '' : ' empty'}" data-id="${t.id}">
+        <label class="ml-head"><input type="checkbox" class="ml-inc" ${n ? 'checked' : 'disabled'}>
+          <b>${esc(titleOf(t))}</b><span class="ml-st">${n ? `已畫 ${n} 個符號` : '尚未繪製（不會放進 PDF）'}</span></label>
+        <textarea class="ml-ref" rows="2" maxlength="300" placeholder="這個主題的想法（選填）" ${n ? '' : 'disabled'}>${esc(store.get('reflect:' + t.id, ''))}</textarea>
+      </div>`;
+    }).join('');
+    $('scopeAllNote').textContent = `（已完成 ${done} / ${BASIC_TOPICS.length} 個）`;
+    return done;
+  }
+  function applyScope() {
+    const all = scopeVal() === 'all';
+    $('multiList').hidden = !all;
+    $('reflectWrap').hidden = all;
+    $('mazeFields').hidden = all || !isMaze(topic);
+    if (all) renderMultiKeep();
+  }
+  function renderMultiKeep() { /* 切換到合併時，保留目前勾選與已輸入的想法 */
+    const keep = {};
+    document.querySelectorAll('#multiList .ml-row').forEach(r => { keep[r.dataset.id] = { inc: r.querySelector('.ml-inc').checked, ref: r.querySelector('.ml-ref').value }; });
+    renderMulti();
+    document.querySelectorAll('#multiList .ml-row').forEach(r => {
+      const k = keep[r.dataset.id]; if (!k || r.classList.contains('empty')) return;
+      r.querySelector('.ml-inc').checked = k.inc; r.querySelector('.ml-ref').value = k.ref;
+    });
+  }
   function loadInfo() {
     const i = store.get('info', {});
     $('fCls').value = i.cls || ''; $('fNo').value = i.no || ''; $('fName').value = i.name || '';
     $('fReflect').value = store.get('reflect:' + (topic ? topic.id : ''), '');
     $('pdfMsg').textContent = ''; $('pdfMsg').className = 'msg';
     mazeSubmitUI();
+    $('scopeOneName').textContent = topic ? titleOf(topic) : '';
+    const done = renderMulti();
+    const useAll = !!topic && !isMaze(topic) && done >= 2;           // 已畫 2 個以上基礎主題：預設合併
+    document.querySelector(`input[name=scope][value=${useAll ? 'all' : 'one'}]`).checked = true;
+    applyScope();
+  }
+  function collectMulti() {
+    const info = { cls: $('fCls').value.trim(), no: $('fNo').value.trim(), name: $('fName').value.trim() };
+    store.set('info', info);
+    saveWork(true);
+    const items = [];
+    document.querySelectorAll('#multiList .ml-row').forEach(r => {
+      const t = topicById(r.dataset.id), ref = r.querySelector('.ml-ref').value;
+      if (!r.classList.contains('empty')) store.set('reflect:' + t.id, ref);
+      if (!r.querySelector('.ml-inc').checked) return;
+      const graph = workOf(t);
+      if (!graph || !graph.nodes.length) return;
+      items.push({ graph, topicTitle: titleOf(t), info, reflection: ref, analysis: FC.analyze(graph, t), includeChecks: $('fChecks').checked, maze: null });
+    });
+    return { multi: items, info, topicTitle: '基礎主題合集', graph: { nodes: items, edges: [] } };
   }
   function collect() {
+    if (scopeVal() === 'all') return collectMulti();
     const info = { cls: $('fCls').value.trim(), no: $('fNo').value.trim(), name: $('fName').value.trim() };
     store.set('info', info);
     store.set('reflect:' + topic.id, $('fReflect').value);
@@ -676,7 +732,7 @@
       pdfDoc = doc; pvIdx = Math.min(pvIdx, doc.pages.length - 1); showPage();
       $('pvState').textContent = '';
       const empty = !d.graph.nodes.length;
-      $('pdfMsg').textContent = empty ? '提醒：你還沒有畫流程圖，回到上一步畫好再下載喔。' : '';
+      $('pdfMsg').textContent = empty ? (d.multi ? '提醒：請至少勾選一個已經畫好的主題。' : '提醒：你還沒有畫流程圖，回到上一步畫好再下載喔。') : '';
       $('pdfMsg').className = 'msg ' + (empty ? 'warn' : '');
     } catch (err) {
       $('pvState').textContent = '預覽失敗：' + err.message;
@@ -691,6 +747,9 @@
   function initSubmit() {
     ['fCls', 'fNo', 'fName', 'fReflect', 'fChecks', 'fBlocks'].forEach(id => $(id).addEventListener('input', () => schedulePreview(500)));
     $('fStatus').addEventListener('change', () => schedulePreview(100));
+    document.querySelectorAll('input[name=scope]').forEach(r => r.addEventListener('change', () => { applyScope(); pvIdx = 0; schedulePreview(50); }));
+    $('multiList').addEventListener('input', () => schedulePreview(500));
+    $('multiList').addEventListener('change', () => { pvIdx = 0; schedulePreview(100); });
     $('fShot').addEventListener('change', async e => {
       const f = e.target.files && e.target.files[0]; if (!f) return;
       try { shots[topic.id] = await readShot(f); } catch (err) { $('shotState').textContent = err.message; $('shotState').className = 'shot-state'; return; }
@@ -704,14 +763,14 @@
       const msg = $('pdfMsg');
       const d = collect();
       if (!d.info.name) { msg.textContent = '請先填寫姓名，老師才知道是誰的作業喔。'; msg.className = 'msg warn'; $('fName').focus(); return; }
-      if (!d.graph.nodes.length) { msg.textContent = '還沒有流程圖內容，請先回到上一步繪製。'; msg.className = 'msg warn'; return; }
+      if (!d.graph.nodes.length) { msg.textContent = d.multi ? '請至少勾選一個已經畫好的主題。' : '還沒有流程圖內容，請先回到上一步繪製。'; msg.className = 'msg warn'; return; }
       if (!window.jspdf) { msg.textContent = 'PDF 元件載入失敗，請重新整理網頁。'; msg.className = 'msg warn'; return; }
       $('btnPdf').disabled = true; msg.textContent = '產生 PDF 中…'; msg.className = 'msg';
       try {
         const doc = await FC.buildPdf(d);
         const pdf = FC.pdfFromDoc(doc);
         const safe = s => s.replace(/[\\/:*?"<>|\s]+/g, '');
-        const fn = `流程圖作業_${safe(d.info.cls)}${safe(d.info.no)}${safe(d.info.name)}_${safe(d.topicTitle)}.pdf`;
+        const fn = `流程圖作業_${safe(d.info.cls)}${safe(d.info.no)}${safe(d.info.name)}_${d.multi ? '基礎主題合集' : safe(d.topicTitle)}.pdf`;
         pdf.save(fn);
         msg.textContent = `已下載：${fn}　請把這個檔案上傳到老師指定的繳交平台。`; msg.className = 'msg ok';
       } catch (err) { msg.textContent = '產生失敗：' + err.message; msg.className = 'msg warn'; }
